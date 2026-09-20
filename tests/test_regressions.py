@@ -10,6 +10,7 @@ import unittest
 
 from pdfbuilder import (
     cid_font,
+    make_standard_pdf,
     one_page_pdf,
     show,
     show_cid,
@@ -241,6 +242,56 @@ class TestXrefRobustness(unittest.TestCase):
             PdfDocument.from_bytes(one_page_pdf(setup, compress=True, xref_stream=True))
         ).extract_page(0)
         self.assertEqual(page.text, "Modern")
+
+
+class TestXrefLineEndings(unittest.TestCase):
+    """缺陷 8：xref 表解析只认 ``\\n`` 换行。
+
+    这是拿真实文件测出来的（一份 11 MB / 382 页的扫描版 PDF，PDF 1.4）。
+    它的 xref 段整段用**裸 ``\\r``** 换行::
+
+        xref\\r0 1593 \\r0000001514 65535 f\\r\\n0000000016 00000 n\\r\\n...
+
+    早期实现用 ``buf.find(b"\\n", pos)`` 找行尾，于是"子段标题行"被一直读到
+    第一条条目末尾，字段数从 2 变成 5，整张表解析失败、``trailer`` 也随之
+    读不到，最终降级为全盘扫描重建——**一份完好的文件被误判成
+    "交叉引用表损坏"**，用户还会看到一条吓人的警告。
+
+    规范 7.2.3 允许 ``\\r``、``\\n``、``\\r\\n`` 三种行结束符，必须都认。
+    """
+
+    ROWS = [(72.0, 700.0, "LINE")]
+
+    def test_lf_line_endings(self):
+        doc = PdfDocument.from_bytes(make_standard_pdf(self.ROWS, eol=b"\n"))
+        self.assertFalse(doc.repaired)
+        self.assertEqual(doc.page_count, 1)
+
+    def test_cr_only_line_endings(self):
+        """裸 \\r 换行——真实文件里踩到的就是这个。"""
+        doc = PdfDocument.from_bytes(make_standard_pdf(self.ROWS, eol=b"\r"))
+        self.assertFalse(doc.repaired, "裸 \\r 换行的 xref 表必须能正常解析，不得触发重建")
+        self.assertEqual(doc.page_count, 1)
+        self.assertIsNotNone(doc.trailer.get("Root"))
+        self.assertEqual(
+            "".join(c.text for c in Extractor(doc).extract_page(0).chars), "LINE"
+        )
+
+    def test_crlf_line_endings(self):
+        doc = PdfDocument.from_bytes(make_standard_pdf(self.ROWS, eol=b"\r\n"))
+        self.assertFalse(doc.repaired)
+        self.assertEqual(
+            "".join(c.text for c in Extractor(doc).extract_page(0).chars), "LINE"
+        )
+
+    def test_all_line_endings_parse_identically(self):
+        """三种换行风格必须得到一致的解析结果（条目数、页数、是否需重建）。"""
+        summaries = []
+        for eol in (b"\n", b"\r", b"\r\n"):
+            doc = PdfDocument.from_bytes(make_standard_pdf(self.ROWS, eol=eol))
+            summaries.append((doc.repaired, doc.page_count, len(doc.xref)))
+        self.assertEqual(summaries[0], summaries[1])
+        self.assertEqual(summaries[0], summaries[2])
 
 
 if __name__ == "__main__":

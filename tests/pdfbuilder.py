@@ -62,9 +62,13 @@ class PdfWriter:
         return num
 
     # -- 输出 ------------------------------------------------------------
-    def build(self, root: int) -> bytes:
-        """用传统 xref 表输出。"""
-        return self._assemble(root, use_xref_stream=False)
+    def build(self, root: int, eol: bytes = b"\n") -> bytes:
+        """用传统 xref 表输出。
+
+        ``eol`` 可以指定 xref 段的换行符，用来构造"裸 \\r 换行"这类真实世界
+        文件（规范允许 ``\\r`` / ``\\n`` / ``\\r\\n`` 三种，解析器必须都认）。
+        """
+        return self._assemble(root, use_xref_stream=False, eol=eol)
 
     def build_xref_stream(self, root: int) -> bytes:
         """用交叉引用流（PDF 1.5+）输出，用于测试该解析路径。"""
@@ -105,6 +109,7 @@ class PdfWriter:
         use_xref_stream: bool,
         packed: dict[int, int] | None = None,
         objstm_num: int | None = None,
+        eol: bytes = b"\n",
     ) -> bytes:
         packed = packed or {}
         out = bytearray(b"%PDF-1.7\n%\xe2\xe3\xcf\xd3\n")
@@ -122,17 +127,19 @@ class PdfWriter:
 
         if not use_xref_stream:
             xref_pos = len(out)
-            out += f"xref\n0 {max_num + 1}\n".encode("latin-1")
-            out += b"0000000000 65535 f \n"
+            out += b"xref" + eol
+            out += f"0 {max_num + 1} ".encode("latin-1") + eol
+            out += b"0000000000 65535 f " + eol
             for num in range(1, max_num + 1):
                 if num in offsets:
-                    out += f"{offsets[num]:010d} 00000 n \n".encode("latin-1")
+                    out += f"{offsets[num]:010d} 00000 n ".encode("latin-1") + eol
                 else:
-                    out += b"0000000000 65535 f \n"
-            out += (
-                f"trailer\n<< /Size {max_num + 1} /Root {root} 0 R >>\n"
-                f"startxref\n{xref_pos}\n%%EOF\n"
-            ).encode("latin-1")
+                    out += b"0000000000 65535 f " + eol
+            out += b"trailer" + eol
+            out += f"<< /Size {max_num + 1} /Root {root} 0 R >>".encode("latin-1") + eol
+            out += b"startxref" + eol
+            out += str(xref_pos).encode("latin-1") + eol
+            out += b"%%EOF" + eol
             return bytes(out)
 
         # 交叉引用流：/W [1 4 2]，每条 7 字节
@@ -434,6 +441,7 @@ def make_standard_pdf(
     *,
     compress: bool = False,
     xref_stream: bool = False,
+    eol: bytes = b"\n",
 ) -> bytes:
     """最简夹具：若干行 WinAnsi 文本。"""
     writer = PdfWriter()
@@ -456,4 +464,4 @@ def make_standard_pdf(
     writer.put(pages_num, f"<< /Type /Pages /Kids [{page_num} 0 R] /Count 1 >>".encode("latin-1"))
     writer.put(root_num, f"<< /Type /Catalog /Pages {pages_num} 0 R >>".encode("latin-1"))
 
-    return writer.build_xref_stream(root_num) if xref_stream else writer.build(root_num)
+    return writer.build_xref_stream(root_num) if xref_stream else writer.build(root_num, eol=eol)

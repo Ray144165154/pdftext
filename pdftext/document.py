@@ -36,6 +36,43 @@ _OBJ_RE = re.compile(rb"(?<![0-9])(\d{1,10})\s+(\d{1,5})\s+obj\b")
 _STARTXREF_RE = re.compile(rb"startxref\s+(\d+)")
 _TRAILER_RE = re.compile(rb"trailer")
 
+# PDF 规范 7.2.3 定义的空白字符（换行符也算）
+_WHITESPACE = b"\x00\t\n\x0c\r "
+
+
+def _skip_whitespace(buf: bytes, pos: int) -> int:
+    """跳过空白字符，返回第一个非空白字节的位置。"""
+    end = len(buf)
+    while pos < end and buf[pos] in _WHITESPACE:
+        pos += 1
+    return pos
+
+
+def _end_of_line(buf: bytes, pos: int) -> int:
+    """返回从 ``pos`` 起的行尾位置（不包含换行符本身）。"""
+    end = len(buf)
+    while pos < end and buf[pos] not in b"\r\n":
+        pos += 1
+    return pos
+
+
+def _after_eol(buf: bytes, pos: int) -> int:
+    """跳过 ``pos`` 处的换行符，返回下一行开头。
+
+    规范允许 ``\\r``、``\\n``、``\\r\\n`` 三种行结束符，这里统一处理。
+    只认 ``\\n`` 是真实踩过的坑：整张 xref 表用裸 ``\\r`` 换行时，
+    行边界全部错位（见 tests/test_regressions.py 的对应用例）。
+    """
+    end = len(buf)
+    if pos < end and buf[pos] == 0x0D:  # CR
+        pos += 1
+        if pos < end and buf[pos] == 0x0A:  # CRLF
+            pos += 1
+        return pos
+    if pos < end and buf[pos] == 0x0A:  # LF
+        return pos + 1
+    return pos
+
 
 class PdfDocument:
     """一个解析好的 PDF 文档。
@@ -129,20 +166,27 @@ class PdfDocument:
         return isinstance(obj, PdfStream) and str(obj.dict.get("Type", "")) == "XRef"
 
     def _load_xref_table(self, offset: int) -> int | None:
-        """解析传统 xref 表。"""
+        """解析传统 xref 表。
+
+        换行符必须按规范同时接受 ``\\r``、``\\n``、``\\r\\n`` 三种写法。
+        早期版本只按 ``\\n`` 找行尾，遇到整张表用裸 ``\\r`` 换行的文件时，
+        会把"子段标题行"一直读到第一条条目末尾，字段数不符导致整张表解析
+        失败，trailer 也随之读不到，最终被迫降级为扫描重建——完好无损的
+        文件被误判成"交叉引用表损坏"。
+
+        因此这里不假设任何换行风格，也不假设条目宽度固定为 20 字节，
+        而是**按行**逐条读取。
+        """
         buf = self.data
         pos = offset + 4  # 跳过 'xref'
 
         while True:
-            # 跳过空白
-            while pos < len(buf) and buf[pos] in b"\x00\t\n\x0c\r ":
-                pos += 1
-            if buf[pos : pos + 7] == b"trailer":
+            pos = _skip_whitespace(buf, pos)
+            if pos >= len(buf) or buf[pos : pos + 7] == b"trailer":
                 break
-            # 读 subsection 头：<start> <count>
-            line_end = buf.find(b"\n", pos)
-            if line_end == -1:
-                break
+
+            # 子段标题行：<起始对象号> <条目数>
+            line_end = _end_of_line(buf, pos)
             header = buf[pos:line_end].split()
             if len(header) != 2:
                 break
@@ -150,24 +194,23 @@ class PdfDocument:
                 start, count = int(header[0]), int(header[1])
             except ValueError:
                 break
-            pos = line_end + 1
+            pos = _after_eol(buf, line_end)
 
             for i in range(count):
-                entry = buf[pos : pos + 20]
-                parts = entry.split()
+                pos = _skip_whitespace(buf, pos)
+                entry_end = _end_of_line(buf, pos)
+                parts = buf[pos:entry_end].split()
                 if len(parts) < 3:
-                    break
+                    break  # 条目畸形：放弃剩余部分，但继续尝试读 trailer
                 try:
                     off = int(parts[0])
                     gen = int(parts[1])
-                    typ = parts[2][:1]
                 except ValueError:
                     break
-                num = start + i
-                if typ == b"n":
-                    # 先出现的条目优先（后读的旧段不应覆盖新段）
-                    self.xref.setdefault(num, (_IN_FILE, off, gen))
-                pos += 20
+                # 先出现的条目优先（后读的旧段不应覆盖新段）
+                if parts[2][:1] == b"n":
+                    self.xref.setdefault(start + i, (_IN_FILE, off, gen))
+                pos = _after_eol(buf, entry_end)
 
         # 读 trailer 字典
         parser = Parser(buf, pos)
