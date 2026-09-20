@@ -44,7 +44,26 @@ def collect_imports(path: pathlib.Path) -> list[tuple[str, int]]:
     return found
 
 
+def _configure_output_encoding() -> None:
+    """把标准输出与标准错误切到 UTF-8。
+
+    本脚本会输出中文和 ``✔``。Windows 上标准输出被重定向时的默认编码是
+    GBK / cp1252，直接 print 会抛 ``UnicodeEncodeError``——CI 的 Windows
+    任务就是这么挂的，所以这里必须显式重配。
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
+            pass
+
+
 def main() -> int:
+    _configure_output_encoding()
+
     if not SRC.is_dir():
         print(f"找不到源码目录: {SRC}", file=sys.stderr)
         return 1

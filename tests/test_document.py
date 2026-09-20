@@ -13,6 +13,7 @@ from pdfbuilder import (
     show,
     simple_font,
 )
+
 from pdftext import Extractor, PdfDocument
 from pdftext.document import DocumentError
 from pdftext.objects import PdfDict, PdfName, PdfRef

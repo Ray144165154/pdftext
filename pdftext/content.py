@@ -27,7 +27,7 @@ Form 里，不支持就等于一个字都提不出来。
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from math import hypot
 from typing import Any
 
@@ -116,7 +116,7 @@ class _State:
         self.render_mode = 0
         self.color: tuple[float, float, float] = (0.0, 0.0, 0.0)
 
-    def copy(self) -> "_State":
+    def copy(self) -> _State:
         new = _State.__new__(_State)
         new.ctm = self.ctm
         new.tm = self.tm

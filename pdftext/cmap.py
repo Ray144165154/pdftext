@@ -27,8 +27,6 @@ from __future__ import annotations
 
 import re
 
-from .objects import Lexer
-
 __all__ = ["parse_tounicode", "decode_utf16be", "ToUnicodeCMap"]
 
 

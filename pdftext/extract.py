@@ -6,8 +6,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Iterable, Iterator
 
 from .content import IDENTITY, ContentInterpreter, TextChar, mat_mul
 from .document import PdfDocument
@@ -160,7 +160,7 @@ class Extractor:
         self.doc = doc
 
     @classmethod
-    def from_file(cls, path) -> "Extractor":
+    def from_file(cls, path) -> Extractor:
         return cls(open_pdf(path))
 
     def page_count(self) -> int:
@@ -199,8 +199,7 @@ class Extractor:
         return [self.extract_page(i) for i in indices]
 
     def iter_pages(self, pages: str | None = None) -> Iterator[Page]:
-        for page in self.extract(pages):
-            yield page
+        yield from self.extract(pages)
 
 
 def extract_pages(path, pages: str | None = None) -> list[Page]:

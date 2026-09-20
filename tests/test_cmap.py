@@ -13,6 +13,7 @@ from pdfbuilder import (
     tounicode_bfrange,
     tounicode_bfrange_array,
 )
+
 from pdftext.cmap import decode_utf16be, parse_tounicode
 
 

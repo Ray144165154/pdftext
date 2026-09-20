@@ -196,7 +196,9 @@ def build_layout(
             line_sizes.append(ch.size)
 
     lines: list[Line] = []
-    for bucket, anchor in zip(buckets, line_anchors):
+    # buckets 与 line_anchors 始终同步增长，长度必然一致；
+    # strict=True 把这个前提写成断言，将来改动破坏同步时会立刻报错
+    for bucket, anchor in zip(buckets, line_anchors, strict=True):
         lines.append(Line(y=anchor, chars=bucket, text=render_line(bucket)))
 
     lines.sort(key=lambda ln: -ln.y)

@@ -10,6 +10,7 @@ import tempfile
 import unittest
 
 from pdfbuilder import make_standard_pdf, multi_page_pdf, one_page_pdf, show, simple_font
+
 from pdftext.cli import build_parser, main
 
 

@@ -57,4 +57,4 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install ruff
-      - run: ruff check src tests
+      - run: ruff check pdftext tests tools

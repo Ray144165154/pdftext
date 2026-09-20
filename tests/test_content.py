@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import unittest
 
-from pdfbuilder import one_page_pdf, show, show_cid, simple_font, cid_font, tounicode_bfchar
+from pdfbuilder import cid_font, one_page_pdf, show, show_cid, simple_font, tounicode_bfchar
+
 from pdftext import Extractor, PdfDocument
 
 

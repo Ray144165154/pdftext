@@ -9,7 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from typing import Sequence
+from collections.abc import Sequence
 
 from . import __version__
 from .document import DocumentError, PdfDocument
@@ -66,6 +66,37 @@ def build_parser() -> argparse.ArgumentParser:
 def _warn(message: str, quiet: bool) -> None:
     if not quiet:
         print(message, file=sys.stderr)
+
+
+def _configure_output_encoding() -> None:
+    """把标准输出与标准错误切到 UTF-8。
+
+    Windows 上 stdout 被**重定向**时的默认编码是 GBK / cp1252（不是 UTF-8），
+    此时输出中文或 ``✔`` 这类符号会直接抛 ``UnicodeEncodeError`` 让程序崩掉。
+    本项目的 CI 就在 Windows 上踩过这个坑，所以这里显式重配。
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
+            pass
+
+
+def _write_stdout(text: str) -> None:
+    """写标准输出，即使上面的重配因为某些环境失败也不会崩。"""
+    if not text:
+        return
+    try:
+        sys.stdout.write(text)
+    except UnicodeEncodeError:
+        buffer = getattr(sys.stdout, "buffer", None)
+        if buffer is None:
+            sys.stdout.write(text.encode("ascii", "replace").decode("ascii"))
+        else:
+            buffer.write(text.encode("utf-8", "replace"))
 
 
 def _extract_one(path: str, args: argparse.Namespace) -> tuple[str, dict | None]:
@@ -130,6 +161,7 @@ def _extract_one(path: str, args: argparse.Namespace) -> tuple[str, dict | None]
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    _configure_output_encoding()
     parser = build_parser()
     args = parser.parse_args(argv)
 
@@ -169,14 +201,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         if not args.quiet:
             print(f"已写入 {args.output}", file=sys.stderr)
     else:
-        # Windows 控制台默认不是 UTF-8，显式写字节避免 UnicodeEncodeError
-        try:
-            sys.stdout.write(output)
-            if output and not output.endswith("\n"):
-                sys.stdout.write("\n")
-        except UnicodeEncodeError:
-            sys.stdout.buffer.write(output.encode("utf-8", "replace"))
-            sys.stdout.buffer.write(b"\n")
+        _write_stdout(output)
+        if output and not output.endswith("\n"):
+            _write_stdout("\n")
 
     return 1 if failed and failed == len(args.files) else 0
 

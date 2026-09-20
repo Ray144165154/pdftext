@@ -14,10 +14,11 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Iterator
+from collections.abc import Iterator
+from typing import Any
 
 from . import filters
-from .objects import NULL, PdfArray, PdfDict, PdfRef, PdfStream, ParseError, Parser
+from .objects import NULL, ParseError, Parser, PdfArray, PdfDict, PdfRef, PdfStream
 
 __all__ = ["PdfDocument", "DocumentError"]
 
@@ -75,12 +76,12 @@ class PdfDocument:
 
     # -- 构造 ------------------------------------------------------------
     @classmethod
-    def from_file(cls, path) -> "PdfDocument":
+    def from_file(cls, path) -> PdfDocument:
         with open(path, "rb") as fh:
             return cls(fh.read())
 
     @classmethod
-    def from_bytes(cls, data: bytes) -> "PdfDocument":
+    def from_bytes(cls, data: bytes) -> PdfDocument:
         return cls(data)
 
     @staticmethod

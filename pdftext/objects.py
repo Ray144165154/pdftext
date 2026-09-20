@@ -22,8 +22,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Any, Iterator
+from typing import Any
 
 __all__ = [
     "PdfName",
@@ -49,7 +50,7 @@ class PdfNull:
 
     _instance = None
 
-    def __new__(cls) -> "PdfNull":
+    def __new__(cls) -> PdfNull:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance

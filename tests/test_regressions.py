@@ -17,6 +17,7 @@ from pdfbuilder import (
     tounicode_bfchar,
     tounicode_bfrange_array,
 )
+
 from pdftext import Extractor, PdfDocument
 
 
@@ -59,7 +60,8 @@ class TestGraphicsStateRestore(unittest.TestCase):
         self.assertEqual(len(set(round(y, 1) for y in ys)), 8, "8 行的基线必须互不相同")
         self.assertEqual(ys, sorted(ys, reverse=True), "行序应从上到下")
         # 关键：相邻行间距必须保持在 40pt 左右，而不是被压扁
-        for upper, lower in zip(ys, ys[1:]):
+        # 这里刻意让两个序列错开一位来取相邻对，长度天然相差 1，故 strict=False
+        for upper, lower in zip(ys, ys[1:], strict=False):
             self.assertAlmostEqual(upper - lower, 40.0, places=3)
 
     def test_qQ_restore_after_translation(self):

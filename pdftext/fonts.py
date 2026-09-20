@@ -22,8 +22,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from .cmap import ToUnicodeCMap, decode_utf16be, parse_tounicode
-from .objects import PdfArray, PdfDict, PdfName, PdfStream
+from .cmap import parse_tounicode
+from .objects import PdfDict, PdfName, PdfStream
 
 __all__ = ["Font", "build_font", "STANDARD_ENCODINGS"]
 
