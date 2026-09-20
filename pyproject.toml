@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pdftext"
+version = "0.1.0"
+description = "零依赖的纯 Python PDF 文本提取器 / Zero-dependency PDF text extractor in pure Python"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Ray144165154" }]
+keywords = ["pdf", "text-extraction", "pdf-parser", "zero-dependency", "cjk", "unicode-cmap"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Text Processing",
+    "Topic :: Utilities",
+    "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://github.com/Ray144165154/pdftext"
+Repository = "https://github.com/Ray144165154/pdftext"
+Issues = "https://github.com/Ray144165154/pdftext/issues"
+Changelog = "https://github.com/Ray144165154/pdftext/blob/main/CHANGELOG.md"
+
+[project.scripts]
+pdftext = "pdftext.cli:main"
+
+[tool.setuptools]
+# 扁平布局：包就在仓库根目录，clone 下来 `python -m pdftext` 直接可用，
+# 不需要先安装。显式列出包名，避免 setuptools 把 tests/tools 也当成包。
+packages = ["pdftext"]
+
+# 本项目运行时零依赖，这一条是刻意留空的
+dependencies = []
+
+[project.optional-dependencies]
+# 仅开发用；运行 pdftext 本身不需要其中任何一个
+dev = ["pytest>=7.0", "ruff>=0.4"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

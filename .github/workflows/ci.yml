@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: 测试 Python ${{ matrix.python-version }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: 验证运行时零依赖
+        run: python tools/check_zero_deps.py
+
+      - name: 运行测试（只用标准库 unittest，无需安装任何包）
+        run: python run_tests.py
+
+      - name: 冒烟测试 CLI
+        shell: bash
+        run: |
+          python -c "
+          import sys; sys.path.insert(0, 'tests')
+          from pdfbuilder import make_standard_pdf
+          open('ci_sample.pdf','wb').write(make_standard_pdf([(72,700,'CI smoke test')]))
+          "
+          python -m pdftext ci_sample.pdf
+          python -m pdftext ci_sample.pdf --stats
+          python -m pdftext ci_sample.pdf --json > /dev/null
+          python -m pdftext ci_sample.pdf --layout > /dev/null
+
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - run: ruff check src tests
